@@ -1,19 +1,14 @@
 import pygame
-from math import sqrt
 
 
 def init():
     pygame.init()
-
+    
     info = pygame.display.Info()
+    
     screen_width, screen_height = info.current_w, info.current_h
 
-    potential_grid_sizes = get_grid_sizes(screen_width, screen_height)
-
-    grid_pixel_size = potential_grid_sizes[round((len(potential_grid_sizes) - 1) / 2)]  # median value, 1080p is size 12
-
-    grid_w = int(screen_width / grid_pixel_size)
-    grid_h = int(screen_height / grid_pixel_size)
+    grid_w, grid_h, grid_pixel_size, current_z = adjust_zoom()
 
     screen_surface = pygame.display.set_mode((screen_width, screen_height), pygame.FULLSCREEN)
 
@@ -25,7 +20,32 @@ def init():
     screen_surface.fill((255, 255, 255))
 
     pygame.display.update()
-    return screen_surface, grid_w, grid_h, hist_grid, ant_position, ant_direction, grid_pixel_size
+    return screen_surface, grid_w, grid_h, hist_grid, ant_position, ant_direction, grid_pixel_size, current_z
+
+
+def adjust_zoom(current_z=None, direction=None):
+
+    info = pygame.display.Info()
+    
+    screen_width, screen_height = info.current_w, info.current_h
+
+    potential_grid_sizes = get_grid_sizes(screen_width, screen_height)
+
+    if current_z == None:
+        current_z = round((len(potential_grid_sizes) - 1) / 2)
+    else:
+        if direction == 'in':
+            current_z -= 1
+        elif direction == 'out':
+            current_z += 1
+        if current_z < 0:
+            current_z = 0
+        elif current_z > (len(potential_grid_sizes) - 1):
+            current_z = (len(potential_grid_sizes) - 1)
+    grid_pixel_size = potential_grid_sizes[current_z]  # median value, 1080p is size 12
+    grid_w = int(screen_width / grid_pixel_size)
+    grid_h = int(screen_height / grid_pixel_size)
+    return grid_w, grid_h, grid_pixel_size, current_z
 
 
 def get_grid_sizes(pixel_width, pixel_height):
@@ -33,14 +53,14 @@ def get_grid_sizes(pixel_width, pixel_height):
     pixel_height_factors = []
     common_factors = []
 
-    for i in range(1, round(sqrt(pixel_width))):
-        for j in range(round(sqrt(pixel_width)), pixel_width + 1):
+    for i in range(1, round((pixel_width)**(1/2))):
+        for j in range(round((pixel_width)**(1/2)), pixel_width + 1):
             if i * j == pixel_width:
                 pixel_width_factors.append(i)
                 pixel_width_factors.append(j)
 
-    for i in range(1, round(sqrt(pixel_height))):
-        for j in range(round(sqrt(pixel_height)), pixel_height + 1):
+    for i in range(1, round((pixel_height)**(1/2))):
+        for j in range(round((pixel_height)**(1/2)), pixel_height + 1):
             if i * j == pixel_height:
                 pixel_height_factors.append(i)
                 pixel_height_factors.append(j)
@@ -101,33 +121,28 @@ def update_grid(grid, prev_pos):
     # white if it went anti-clockwise
     # you could probably just set the value to opposite of what it was too but-
     # that won't work for multi-states
-    remove_queue = {}
     try:
         grid[(prev_pos[0], prev_pos[1])]  # if it doesn't trigger a value error it deletes the value
-        remove_queue[(prev_pos[0], prev_pos[1])] = 0
         del grid[(prev_pos[0], prev_pos[1])]  # delete the value to make it a white tile, probably call a draw function
     except KeyError:
         grid[(prev_pos[0], prev_pos[1])] = 1  # set the tile to black because it didn't exist, which implies it is white
-    return grid, remove_queue
+    return grid
 
 
-def render_graphics(screen_surface, grid, remove_queue, pos, grid_pixel_size, grid_w, grid_h):
+def render_graphics(screen_surface, grid, pos, grid_pixel_size, grid_w, grid_h):
     screen.fill((255, 255, 255))  # probably not
-    draw_grid(screen_surface, grid_pixel_size, grid_w, grid_h)
     for cell_pos, cell_value in grid.items():
-        # print(cell_pos)
         cell_colour = (0, 0, 0)
         draw_cell(screen_surface, cell_pos[0], cell_pos[1], cell_colour, grid_w, grid_h, grid_pixel_size)
-    for cell_pos, cell_value in remove_queue.items():
-        cell_colour = (255, 255, 255)
-        draw_cell(screen_surface, cell_pos[0], cell_pos[1], cell_colour, grid_w, grid_h, grid_pixel_size)
     draw_ant(screen_surface, pos, grid_w, grid_h, grid_pixel_size)
-    pygame.display.update()
+    draw_grid(screen_surface, grid_pixel_size, grid_w, grid_h)
+    pygame.display.update()  # Only update the affected cells, do a full update when scrolling
 
-
-def draw_grid(screen_surface, grid_pixel_size, grid_w, grid_h):
+    
+def draw_grid(screen_surface, grid_pixel_size, grid_w, grid_h):  # fine
     colour = (0, 0, 0)
-    for cell_x in range(0, grid_w+1):  # think of a better automatic method
+    # print(screen_surface, grid_pixel_size, grid_w, grid_h)
+    for cell_x in range(0, grid_w):  # think of a better automatic method
         pixel_offset_x_start = (cell_x * grid_pixel_size)  # +(grid_w * grid_pixel_size)
         pixel_offset_y_start = 0
         pixel_offset_x_end = (cell_x * grid_pixel_size)  # + (grid_w * grid_pixel_size)
@@ -136,7 +151,7 @@ def draw_grid(screen_surface, grid_pixel_size, grid_w, grid_h):
         start_pos = (pixel_offset_x_start, pixel_offset_y_start)
         end_pos = (pixel_offset_x_end, pixel_offset_y_end)
         pygame.draw.line(screen_surface, colour, start_pos, end_pos)
-    for cell_y in range(0, grid_h+1):
+    for cell_y in range(0, grid_h):
         pixel_offset_x_start = 0
         pixel_offset_y_start = (cell_y * grid_pixel_size)  # +(grid_h * grid_pixel_size)
         pixel_offset_x_end = grid_w * grid_pixel_size
@@ -156,7 +171,7 @@ def draw_cell(screen_surface, cell_x, cell_y, colour, grid_w, grid_h, grid_pixel
     pixel_offset_y_start = (cell_y * grid_pixel_size) + int((grid_h * grid_pixel_size) / 2)
     pixel_offset_width = grid_pixel_size
     pixel_offset_height = grid_pixel_size
-
+    
     points = (pixel_offset_x_start, pixel_offset_y_start, pixel_offset_width, pixel_offset_height)
 
     pygame.draw.rect(screen_surface, colour, points)
@@ -171,12 +186,25 @@ def draw_ant(screen_surface, pos, grid_w, grid_h, grid_pixel_size):
     return
 
 
-screen, grid_width, grid_height, history_grid, ant_pos, ant_orientation, grid_size = init()
+screen, grid_width, grid_height, history_grid, ant_pos, ant_orientation, grid_size, current_zoom = init()
 
+running = True
 
-while True:
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 4:
+                grid_width, grid_height, grid_size, current_zoom = adjust_zoom(current_zoom, 'out')
+            elif event.button == 5:
+                grid_width, grid_height, grid_size, current_zoom = adjust_zoom(current_zoom, 'in')
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                running = False
+                
     tile_value = check_ant(history_grid, ant_pos)
     ant_orientation = orient_ant(ant_orientation, tile_value)
     ant_pos, ant_prev_pos = move_ant(ant_pos, ant_orientation)
-    history_grid, deletion_queue = update_grid(history_grid, ant_prev_pos)
-    render_graphics(screen, history_grid, deletion_queue, ant_pos, grid_size, grid_width, grid_height)
+    history_grid = update_grid(history_grid, ant_prev_pos)
+    render_graphics(screen, history_grid, ant_pos, grid_size, grid_width, grid_height)
+
+pygame.quit()
