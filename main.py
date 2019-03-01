@@ -218,6 +218,15 @@ while running:
                 else:
                     grid_flag = True
                     scroll_flag = True  # to update the entire screen
+            if event.key == pygame.K_r:
+                history_grid = {}
+                ant_pos = [0, 0]
+                ant_orientation = 0
+                scroll_flag = True  # to update the entire screen
+            if event.key == pygame.K_f:
+                ant_pos = [0, 0]
+                ant_orientation = 0
+                scroll_flag = True  # to update the entire screen
                 
     tile_value = check_ant(history_grid, ant_pos)
     ant_orientation = orient_ant(ant_orientation, tile_value)
