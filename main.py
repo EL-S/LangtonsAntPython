@@ -8,7 +8,7 @@ def init():
     
     screen_width, screen_height = info.current_w, info.current_h
 
-    grid_w, grid_h, grid_pixel_size, current_z = adjust_zoom()
+    grid_w, grid_h, grid_pixel_size, current_z, scroll = adjust_zoom()
 
     screen_surface = pygame.display.set_mode((screen_width, screen_height), pygame.FULLSCREEN)
 
@@ -20,10 +20,13 @@ def init():
     screen_surface.fill((255, 255, 255))
 
     pygame.display.update()
-    return screen_surface, grid_w, grid_h, hist_grid, ant_position, ant_direction, grid_pixel_size, current_z
+
+    grid_toggle = True
+    
+    return screen_surface, grid_w, grid_h, hist_grid, ant_position, ant_direction, grid_pixel_size, current_z, scroll, grid_toggle
 
 
-def adjust_zoom(current_z=None, direction=None):
+def adjust_zoom(current_z=None, direction=None, scroll=True):
 
     info = pygame.display.Info()
     
@@ -45,7 +48,8 @@ def adjust_zoom(current_z=None, direction=None):
     grid_pixel_size = potential_grid_sizes[current_z]  # median value, 1080p is size 12
     grid_w = int(screen_width / grid_pixel_size)
     grid_h = int(screen_height / grid_pixel_size)
-    return grid_w, grid_h, grid_pixel_size, current_z
+    scroll = True
+    return grid_w, grid_h, grid_pixel_size, current_z, scroll
 
 
 def get_grid_sizes(pixel_width, pixel_height):
@@ -129,14 +133,20 @@ def update_grid(grid, prev_pos):
     return grid
 
 
-def render_graphics(screen_surface, grid, pos, grid_pixel_size, grid_w, grid_h):
+def render_graphics(screen_surface, grid, pos, grid_pixel_size, grid_w, grid_h, scroll, previous_rect, grid_toggle):
+    # this is the slowest function
     screen.fill((255, 255, 255))  # probably not
-    for cell_pos, cell_value in grid.items():
-        cell_colour = (0, 0, 0)
-        draw_cell(screen_surface, cell_pos[0], cell_pos[1], cell_colour, grid_w, grid_h, grid_pixel_size)
-    draw_ant(screen_surface, pos, grid_w, grid_h, grid_pixel_size)
-    draw_grid(screen_surface, grid_pixel_size, grid_w, grid_h)
-    pygame.display.update()  # Only update the affected cells, do a full update when scrolling
+    for cell_pos in grid:
+        draw_cell(screen_surface, cell_pos[0], cell_pos[1], (0, 0, 0), grid_w, grid_h, grid_pixel_size)
+    current_rect = draw_ant(screen_surface, pos, grid_w, grid_h, grid_pixel_size)
+    if grid_toggle:
+        draw_grid(screen_surface, grid_pixel_size, grid_w, grid_h)
+    if scroll:
+        pygame.display.update()  # Only update the affected cells, do a full update when scrolling
+        scroll = False
+    else:
+        pygame.display.update([current_rect, previous_rect])
+    return scroll, current_rect
 
     
 def draw_grid(screen_surface, grid_pixel_size, grid_w, grid_h):  # fine
@@ -175,36 +185,45 @@ def draw_cell(screen_surface, cell_x, cell_y, colour, grid_w, grid_h, grid_pixel
     points = (pixel_offset_x_start, pixel_offset_y_start, pixel_offset_width, pixel_offset_height)
 
     pygame.draw.rect(screen_surface, colour, points)
-    return
+    return points
 
 
 def draw_ant(screen_surface, pos, grid_w, grid_h, grid_pixel_size):
     ant_colour = (255, 0, 0)
     ant_x = pos[0]
     ant_y = pos[1]
-    draw_cell(screen_surface, ant_x, ant_y, ant_colour, grid_w, grid_h, grid_pixel_size)
-    return
+    ant_rect = draw_cell(screen_surface, ant_x, ant_y, ant_colour, grid_w, grid_h, grid_pixel_size)
+    return ant_rect
 
 
-screen, grid_width, grid_height, history_grid, ant_pos, ant_orientation, grid_size, current_zoom = init()
+screen, grid_width, grid_height, history_grid, ant_pos, ant_orientation, grid_size, current_zoom, scroll_flag, grid_flag = init()
 
 running = True
+current_rect_p = [0, 0, 0, 0]
 
 while running:
     for event in pygame.event.get():
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 4:
-                grid_width, grid_height, grid_size, current_zoom = adjust_zoom(current_zoom, 'out')
+                grid_width, grid_height, grid_size, current_zoom, scroll_flag = adjust_zoom(current_zoom, 'out', scroll_flag)
             elif event.button == 5:
-                grid_width, grid_height, grid_size, current_zoom = adjust_zoom(current_zoom, 'in')
+                grid_width, grid_height, grid_size, current_zoom, scroll_flag = adjust_zoom(current_zoom, 'in', scroll_flag)
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 running = False
+            if event.key == pygame.K_g:
+                if grid_flag:
+                    grid_flag = False
+                    scroll_flag = True  # to update the entire screen
+                else:
+                    grid_flag = True
+                    scroll_flag = True  # to update the entire screen
                 
     tile_value = check_ant(history_grid, ant_pos)
     ant_orientation = orient_ant(ant_orientation, tile_value)
     ant_pos, ant_prev_pos = move_ant(ant_pos, ant_orientation)
     history_grid = update_grid(history_grid, ant_prev_pos)
-    render_graphics(screen, history_grid, ant_pos, grid_size, grid_width, grid_height)
+    scroll_flag, current_rect_p = render_graphics(screen, history_grid, ant_pos, grid_size, grid_width, grid_height, scroll_flag, current_rect_p, grid_flag)
+
 
 pygame.quit()
