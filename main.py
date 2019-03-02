@@ -108,13 +108,13 @@ def move_ant(pos, orientation):
 
     prev_pos = pos
 
-    if orientation == 0:
-        pos[1] -= 1  # moves up 1 north
-    elif orientation == 1:
-        pos[0] += 1  # moves right 1 east
+    if orientation == 3:  # I scrambled these arbatrarilly so that it was the same as the original version  
+        pos[1] += 1  # moves up 1 north
     elif orientation == 2:
-        pos[1] += 1  # moves down 1 south
-    elif orientation == 3:
+        pos[0] += 1  # moves right 1 east
+    elif orientation == 1:
+        pos[1] -= 1  # moves down 1 south
+    elif orientation == 0:
         pos[0] -= 1  # moves left 1 west
     return pos, prev_pos
 
@@ -133,18 +133,28 @@ def update_grid(grid, prev_pos):
     return grid
 
 
-def render_graphics(screen_surface, grid, pos, grid_pixel_size, grid_w, grid_h, scroll, previous_rect, grid_toggle):
-    # this is the slowest function
-    screen.fill((255, 255, 255))  # probably not
-    for cell_pos in grid:
-        draw_cell(screen_surface, cell_pos[0], cell_pos[1], (0, 0, 0), grid_w, grid_h, grid_pixel_size)
-    current_rect = draw_ant(screen_surface, pos, grid_w, grid_h, grid_pixel_size)
-    if grid_toggle:
-        draw_grid(screen_surface, grid_pixel_size, grid_w, grid_h)
-    if scroll:
+def render_graphics(screen_surface, grid, pos, grid_pixel_size, grid_w, grid_h, scroll, previous_rect, grid_toggle, update_freq):
+    if scroll or update_freq != 1:
+        screen.fill((255, 255, 255))  # probably not
+        for cell_pos in grid:
+            draw_cell(screen_surface, cell_pos[0], cell_pos[1], (0, 0, 0), grid_w, grid_h, grid_pixel_size)
+        if grid_toggle:
+            draw_grid(screen_surface, grid_pixel_size, grid_w, grid_h)
+        current_rect = draw_ant(screen_surface, pos, grid_w, grid_h, grid_pixel_size)
         pygame.display.update()  # Only update the affected cells, do a full update when scrolling
         scroll = False
     else:
+        cell_x = int((previous_rect[0]  - int((grid_w * grid_pixel_size) / 2)) / grid_pixel_size)
+        cell_y = int((previous_rect[1]  - int((grid_h * grid_pixel_size) / 2)) / grid_pixel_size)
+        try:
+            grid[(cell_x, cell_y)]
+            cell_colour = (0, 0, 0)
+        except:
+            cell_colour = (255, 255, 255)
+        draw_cell(screen_surface, cell_x, cell_y, cell_colour, grid_w, grid_h, grid_pixel_size)
+        if grid_toggle:
+            draw_grid(screen_surface, grid_pixel_size, grid_w, grid_h)
+        current_rect = draw_ant(screen_surface, pos, grid_w, grid_h, grid_pixel_size)
         pygame.display.update([current_rect, previous_rect])
     return scroll, current_rect
 
@@ -201,6 +211,9 @@ screen, grid_width, grid_height, history_grid, ant_pos, ant_orientation, grid_si
 running = True
 current_rect_p = [0, 0, 0, 0]
 
+update_frequency = 1
+counter = 1
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -227,12 +240,21 @@ while running:
                 ant_pos = [0, 0]
                 ant_orientation = 0
                 scroll_flag = True  # to update the entire screen
-                
+            if event.key == pygame.K_1:
+                update_frequency = round(update_frequency / 2)
+                if update_frequency < 1:
+                    update_frequency = 1
+                counter = 0
+            if event.key == pygame.K_2:
+                update_frequency = update_frequency * 2
+                counter = 0
     tile_value = check_ant(history_grid, ant_pos)
     ant_orientation = orient_ant(ant_orientation, tile_value)
     ant_pos, ant_prev_pos = move_ant(ant_pos, ant_orientation)
     history_grid = update_grid(history_grid, ant_prev_pos)
-    scroll_flag, current_rect_p = render_graphics(screen, history_grid, ant_pos, grid_size, grid_width, grid_height, scroll_flag, current_rect_p, grid_flag)
-
+    if counter == update_frequency:
+        scroll_flag, current_rect_p = render_graphics(screen, history_grid, ant_pos, grid_size, grid_width, grid_height, scroll_flag, current_rect_p, grid_flag, update_frequency)
+        counter = 0
+    counter += 1
 
 pygame.quit()
