@@ -45,10 +45,10 @@ def adjust_zoom(current_z=None, direction=None, scroll=True):
             current_z = 0
         elif current_z > (len(potential_grid_sizes) - 1):
             current_z = (len(potential_grid_sizes) - 1)
+    scroll = True
     grid_pixel_size = potential_grid_sizes[current_z]  # median value, 1080p is size 12
     grid_w = int(screen_width / grid_pixel_size)
     grid_h = int(screen_height / grid_pixel_size)
-    scroll = True
     return grid_w, grid_h, grid_pixel_size, current_z, scroll
 
 
@@ -206,6 +206,43 @@ def draw_ant(screen_surface, pos, grid_w, grid_h, grid_pixel_size):
     return ant_rect
 
 
+def key_check(grid_w, grid_h, grid_pixel_size, current_z, scroll, grid_toggle, grid, pos, orientation, update_freq, c, run):
+    for event in pygame.event.get():
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 4:
+                grid_w, grid_h, grid_pixel_size, current_z, scroll = adjust_zoom(current_z, 'out', scroll)
+            elif event.button == 5:
+                grid_w, grid_h, grid_pixel_size, current_z, scroll = adjust_zoom(current_z, 'in', scroll)
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                run = False
+            if event.key == pygame.K_g:
+                if grid_toggle:
+                    grid_toggle = False
+                    scroll = True  # to update the entire screen
+                else:
+                    grid_toggle = True
+                    scroll = True  # to update the entire screen
+            if event.key == pygame.K_r:
+                grid = {}
+                pos = [0, 0]
+                orientation = 0
+                scroll = True  # to update the entire screen
+            if event.key == pygame.K_f:
+                pos = [0, 0]
+                orientation = 0
+                scroll = True  # to update the entire screen
+            if event.key == pygame.K_1:
+                update_freq = round(update_freq / 2)
+                if update_freq < 1:
+                    update_freq = 1
+                c = 0
+            if event.key == pygame.K_2:
+                update_freq *= 2
+                c = 0
+    return grid_w, grid_h, grid_pixel_size, current_z, scroll, grid_toggle, grid, pos, orientation, update_freq, c, run
+
+
 screen, grid_width, grid_height, history_grid, ant_pos, ant_orientation, grid_size, current_zoom, scroll_flag, grid_flag = init()
 
 running = True
@@ -215,39 +252,7 @@ update_frequency = 1
 counter = 1
 
 while running:
-    for event in pygame.event.get():
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 4:
-                grid_width, grid_height, grid_size, current_zoom, scroll_flag = adjust_zoom(current_zoom, 'out', scroll_flag)
-            elif event.button == 5:
-                grid_width, grid_height, grid_size, current_zoom, scroll_flag = adjust_zoom(current_zoom, 'in', scroll_flag)
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                running = False
-            if event.key == pygame.K_g:
-                if grid_flag:
-                    grid_flag = False
-                    scroll_flag = True  # to update the entire screen
-                else:
-                    grid_flag = True
-                    scroll_flag = True  # to update the entire screen
-            if event.key == pygame.K_r:
-                history_grid = {}
-                ant_pos = [0, 0]
-                ant_orientation = 0
-                scroll_flag = True  # to update the entire screen
-            if event.key == pygame.K_f:
-                ant_pos = [0, 0]
-                ant_orientation = 0
-                scroll_flag = True  # to update the entire screen
-            if event.key == pygame.K_1:
-                update_frequency = round(update_frequency / 2)
-                if update_frequency < 1:
-                    update_frequency = 1
-                counter = 0
-            if event.key == pygame.K_2:
-                update_frequency = update_frequency * 2
-                counter = 0
+    grid_width, grid_height, grid_size, current_zoom, scroll_flag, grid_flag, history_grid, ant_pos, ant_orientation, update_frequency, counter, running = key_check(grid_width, grid_height, grid_size, current_zoom, scroll_flag, grid_flag, history_grid, ant_pos, ant_orientation, update_frequency, counter, running)
     tile_value = check_ant(history_grid, ant_pos)
     ant_orientation = orient_ant(ant_orientation, tile_value)
     ant_pos, ant_prev_pos = move_ant(ant_pos, ant_orientation)
