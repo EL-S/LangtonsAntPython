@@ -257,7 +257,7 @@ while running:
     ant_orientation = orient_ant(ant_orientation, tile_value)
     ant_pos, ant_prev_pos = move_ant(ant_pos, ant_orientation)
     history_grid = update_grid(history_grid, ant_prev_pos)
-    if counter == update_frequency:
+    if counter == update_frequency:  # make a queue of stuff that needs to be updated when the program is skipping frames to improve performance
         scroll_flag, current_rect_p = render_graphics(screen, history_grid, ant_pos, grid_size, grid_width, grid_height, scroll_flag, current_rect_p, grid_flag, update_frequency)
         counter = 0
     counter += 1
